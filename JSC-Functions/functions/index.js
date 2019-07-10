@@ -95,6 +95,17 @@ app.post('/post', (request, response) => {
 //         });
 // });
 
+
+const isEmpty = (string) => {
+    if(string.trim() === '') return true;
+        else return false;
+}
+const isEmail = (email) => {
+    const RegEx = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+    if(email.match(RegEx)) return true;
+        else return false;
+}
+
 // Registration Route
 app.post('/signup', (request, response) => {
     const newUser = {
@@ -103,7 +114,25 @@ app.post('/signup', (request, response) => {
         confirmPassword: request.body.confirmPassword,
         handle: request.body.handle
     };
-    //TODO: validate the data:
+
+    let errors = {};
+    if(isEmpty(newUser.email)) {
+        errors.email = 'Email is required'
+    } else if (!isEmail(newUser.email)) {
+        errors.email = 'Not vaild Email!'
+    }
+    if(isEmpty(newUser.password)) errors.password = 'Password is required'
+    if(newUser.confirmPassword !== newUser.password) errors.confirmPassword = 'Passwords must match!'
+    if(isEmpty(newUser.handle)) errors.handel = 'Handle is required'
+
+    // If the errors object is NOT empty (NOT All the data are vaild and we have ERRORS!) ...
+    // return the {errors} object and end the function ...
+    if(Object.keys(errors).length > 0) {
+        return response.status(400).json(errors);
+    }
+
+    // else ......
+    // TODO: validate the data:
     let ttoken, userId;
     db.doc(`/users/${newUser.handle}`).get()
         .then(doc => {
@@ -137,6 +166,43 @@ app.post('/signup', (request, response) => {
         });
 })
 
+// Login Route 
+app.post('/login', (request, response) => {
+    const user = {
+        email: request.body.email,
+        password: request.body.password
+    };
+
+    let errors = {};
+    if(isEmpty(user.email)) {
+        errors.email = 'Email is required'
+    } else if (!isEmail(user.email)) {
+        errors.email = 'Not vaild Email!'
+    }
+    if(isEmpty(user.password)) errors.password = 'Password is required';
+
+    // If the errors object is NOT empty (NOT All the data are vaild and we have ERRORS!) ...
+    // return the {errors} object and end the function ...
+    if(Object.keys(errors).length > 0) {
+        return response.status(400).json(errors);
+    }
+
+    // else ......
+    firebase.auth().signInWithEmailAndPassword(user.email, user.password)
+        .then(data => {
+            return data.user.getIdToken();
+        }).then(token => {
+            return response.json({token});
+        }).catch(err => {
+            console.error(err);
+            if(err.code === "auth/wrong-password") {
+                return response.status(403).json({error: `Wrong Password, please try again`});
+            } else {
+                return response.status(500).json({error: err.code});
+            }
+        });
+
+})
 
 
 // We need to tell firebase that (app) .. is the now the container for all our Routes ..
