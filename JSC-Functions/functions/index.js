@@ -20,6 +20,33 @@ firebase.initializeApp(firebaseConfig);
 
 const db = admin.firestore();
 
+// Authentication Middleware:
+const fbAuth = (request, response, next) => {
+    let idToken;
+    if(request.headers.authorization && request.headers.authorization.startsWith('Bearer ')) {
+        idToken = request.headers.authorization.split('Bearer ')[1];
+    } else {
+        console.error('No token found');
+        return response.status(403).json({error: 'Unauthorized'});
+    }
+
+    admin.auth().verifyIdToken(idToken)
+        .then(decodedToken => {
+            request.user = decodedToken;
+            console.log(decodedToken);
+            return db.collection('users')
+                .where('userID', '==', request.user.uid).limit(1).get();
+        })
+        .then(data => {
+            request.user.handle = data.docs[0].data().handle;
+            return next();
+        })
+        .catch(err => {
+            console.error('Error while verifying token', err);
+            return res.status(403).json(err);
+        })
+}
+
 // // Create and Deploy Your First Cloud Functions
 // // https://firebase.google.com/docs/functions/write-firebase-functions
 //
@@ -38,7 +65,12 @@ app.get('/posts', (request, response) => {
             data.forEach(doc => {
                 posts.push({
                     postId: doc.id, // i need the post ID, with the rest of the {...post object}...
-                    ...doc.data() 
+                    // ...doc.data()
+                    body: doc.data().body,
+                    userHandle: doc.data().userHandle,
+                    createdAt: doc.data().createdAt,
+                    commentCount: doc.data().commentCount, 
+                    likeCount: doc.data().likeCount,
                 });
             })
             return response.json(posts);
@@ -58,10 +90,10 @@ app.get('/posts', (request, response) => {
 //         .catch(err => console.error(err));
 // });
 
-app.post('/post', (request, response) => {
+app.post('/post', fbAuth, (request, response) => {
     const newPost = {
         body: request.body.body,
-        userHandle: request.body.userHandle,
+        userHandle: request.user.handle,
         createdAt: new Date().toISOString()
     };
     db
@@ -123,7 +155,7 @@ app.post('/signup', (request, response) => {
     }
     if(isEmpty(newUser.password)) errors.password = 'Password is required'
     if(newUser.confirmPassword !== newUser.password) errors.confirmPassword = 'Passwords must match!'
-    if(isEmpty(newUser.handle)) errors.handel = 'Handle is required'
+    if(isEmpty(newUser.handle)) errors.handle = 'Handle is required'
 
     // If the errors object is NOT empty (NOT All the data are vaild and we have ERRORS!) ...
     // return the {errors} object and end the function ...
@@ -137,7 +169,7 @@ app.post('/signup', (request, response) => {
     db.doc(`/users/${newUser.handle}`).get()
         .then(doc => {
             if(doc.exists){
-                response.status(400).json({handel: `This handle is already taken!`});
+                response.status(400).json({handle: `This handle is already taken!`});
             } else {
                 return firebase.auth().createUserWithEmailAndPassword(newUser.email, newUser.password);
             }
@@ -147,7 +179,7 @@ app.post('/signup', (request, response) => {
         }).then(token => {
             ttoken = token;
             const userCredentials = {
-                handel: newUser.handle,
+                handle: newUser.handle,
                 email: newUser.email,
                 createdAt: new Date().toISOString(),
                 userID: userId
