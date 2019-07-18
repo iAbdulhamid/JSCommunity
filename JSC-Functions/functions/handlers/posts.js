@@ -1,8 +1,7 @@
 const {db} = require('../util/admin');
 
 exports.getAllPosts = (request, response) => {
-    db
-    .collection('posts')
+    db.collection('posts')
     .orderBy('createdAt', 'desc')
     .get()
         .then(data => {
@@ -17,10 +16,13 @@ exports.getAllPosts = (request, response) => {
                     commentCount: doc.data().commentCount, 
                     likeCount: doc.data().likeCount,
                 });
-            })
+            });
             return response.json(posts);
         })
-        .catch(err => console.error(err));
+        .catch(err => {
+            console.error(err);
+            response.status(500).json({error: err.code});
+        });
 }
 // before Express:
 // exports.getPosts = functions.https.onRequest((request, response) => {

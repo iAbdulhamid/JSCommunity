@@ -1,7 +1,7 @@
 // My Modules:
 const { admin, db }              = require('./util/admin');
 const { getAllPosts, postOne }   = require('./handlers/posts');
-const { signUp, login }          = require('./handlers/users');
+const { signUp, login, uploadImage }          = require('./handlers/users');
 const fbAuth                     = require('./util/fbAuth');
 
 
@@ -23,7 +23,7 @@ const app       = express();
 // firebase.initializeApp(firebaseConfig);
 
 
-// Authentication Middleware:
+
 
 
 // POSTS Routes:
@@ -39,6 +39,9 @@ app.post('/post', fbAuth, postOne)
 app.post('/signup', signUp);
 // 2. Login Route 
 app.post('/login', login);
+// 3. Upload Image
+app.post('/user/image', fbAuth, uploadImage); 
+
 
 
 // We need to tell firebase that (app) .. is the now the container for all our Routes ..
